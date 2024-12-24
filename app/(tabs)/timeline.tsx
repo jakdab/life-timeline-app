@@ -1,23 +1,53 @@
-import React from "react";
-import { View, FlatList, Text, StyleSheet } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, FlatList, StyleSheet } from "react-native";
+import { Card, Text } from "react-native-paper";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase"; // Ensure the path to your firebase.ts file is correct
 
-const events = [
-  { id: "1", title: "Graduated High School", date: "2015-06-10" },
-  { id: "2", title: "Started First Job", date: "2018-09-01" },
-  { id: "3", title: "Got Married", date: "2021-05-20" },
-];
+// Add interface for Event type
+interface Event {
+  id: string;
+  title: string;
+  date: string;
+  [key: string]: any; // for any additional fields
+}
 
 const TimelineScreen = () => {
+  const [events, setEvents] = useState<Event[]>([]); // Add type annotation here
+
+  // Function to fetch events from Firestore
+  const fetchEvents = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "events"));
+      const eventsData = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        title: doc.data().title as string,
+        date: doc.data().date as string,
+        ...doc.data(),
+      })) as Event[];
+      setEvents(eventsData);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+    }
+  };
+
+  // Fetch events on component mount
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
   return (
     <View style={styles.container}>
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.event}>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.date}>{item.date}</Text>
-          </View>
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text variant="titleLarge">{item.title}</Text>
+              <Text variant="bodyMedium">{item.date}</Text>
+            </Card.Content>
+          </Card>
         )}
       />
     </View>
@@ -26,9 +56,9 @@ const TimelineScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  event: { marginBottom: 10, padding: 10, borderWidth: 1, borderColor: "#ddd" },
-  title: { fontSize: 18, fontWeight: "bold" },
-  date: { fontSize: 14, color: "#888" },
+  card: {
+    marginBottom: 10,
+  },
 });
 
 export default TimelineScreen;
