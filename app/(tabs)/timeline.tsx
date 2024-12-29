@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, FlatList, StyleSheet, Text, Image } from "react-native";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db } from "../../lib/firebase";
 import { useTheme, MD3Theme } from "react-native-paper";
 
 // Define the Event type
@@ -12,28 +12,34 @@ interface Event {
   description?: string;
   tags?: string[];
   images?: string[];
+  createdAt: string;
 }
 
 const TimelineScreen = () => {
   const theme = useTheme();
   const [events, setEvents] = useState<Event[]>([]);
 
-  // Fetch events from Firestore
-  const fetchEvents = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "events"));
-      const eventsData = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Event[];
-      setEvents(eventsData);
-    } catch (error) {
-      console.error("Error fetching events:", error);
-    }
-  };
-
   useEffect(() => {
-    fetchEvents();
+    // Create a query to sort events by date
+    const q = query(collection(db, "events"), orderBy("createdAt", "desc"));
+
+    // Set up real-time listener
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const updatedEvents = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Event[];
+        setEvents(updatedEvents);
+      },
+      (error) => {
+        console.error("Error fetching events:", error);
+      }
+    );
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
   }, []);
 
   const styles = makeStyles(theme);
