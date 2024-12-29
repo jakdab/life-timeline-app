@@ -1,21 +1,23 @@
 {
   "expo": {
-    "name": "life-timeline-app",
-    "slug": "life-timeline-app",
+    "name": "Life Timeline",
+    "slug": "life-timeline",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "lifetimeline",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jakub.lifetimeline"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.jakub.lifetimeline"
     },
     "web": {
       "bundler": "metro",
@@ -36,6 +38,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "fonts": [
+      {
+        "asset": "assets/fonts/PPNeueMontreal-Medium.otf"
+      },
+      {
+        "asset": "assets/fonts/PPNeueMontreal-Bold.otf"
+      }
+    ],
+    "entryPoint": "./index.ts"
   }
 }

@@ -41,3 +41,8 @@ app-example
 
 # Ignore editor settings
 settings.json
+
+assets/images/*
+!assets/images/.gitkeep
+!assets/fonts/
+!assets/fonts/*.otf

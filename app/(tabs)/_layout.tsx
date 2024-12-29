@@ -1,37 +1,41 @@
-import { Tabs } from "expo-router";
+import { Tabs, Redirect } from "expo-router";
+import { useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-export default function TabsLayout() {
+export default function TabLayout() {
+  const theme = useTheme();
+
   return (
-    <Tabs>
+    <Tabs
+      screenOptions={{
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.outline,
+        },
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.secondary,
+        headerStyle: {
+          backgroundColor: theme.colors.surface,
+        },
+        headerTitleStyle: {
+          color: theme.colors.primary,
+        },
+        headerShadowVisible: false,
+      }}
+    >
       <Tabs.Screen
-        name="home"
+        name="index"
         options={{
-          title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home" color={color} size={size} />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen
         name="timeline"
         options={{
           title: "Timeline",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="timeline" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: "Explore",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="compass-outline"
-              color={color}
-              size={size}
-            />
+          headerTitle: "TIMELINE",
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="clock-outline" color={color} />
           ),
         }}
       />
@@ -39,15 +43,24 @@ export default function TabsLayout() {
         name="addEvent"
         options={{
           title: "Add Event",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="plus-circle"
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="plus-circle-outline" color={color} />
           ),
         }}
       />
     </Tabs>
   );
+}
+
+function TabBarIcon(props: {
+  name: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+  color: string;
+}) {
+  return (
+    <MaterialCommunityIcons size={24} style={{ marginBottom: -3 }} {...props} />
+  );
+}
+
+export function Index() {
+  return <Redirect href="/timeline" />;
 }
