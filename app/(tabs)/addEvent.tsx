@@ -55,6 +55,13 @@ const AddEventScreen = () => {
         value={title}
         onChangeText={setTitle}
         disabled={loading}
+        textColor="white"
+        theme={{
+          colors: {
+            onSurfaceVariant: "rgba(255, 255, 255, 0.7)", // Slightly transparent white for placeholder
+            onSurface: "white", // Full white for input text
+          },
+        }}
       />
       <TextInput
         style={styles.input}
@@ -63,12 +70,22 @@ const AddEventScreen = () => {
         value={date}
         onChangeText={setDate}
         disabled={loading}
+        textColor="white"
+        theme={{
+          colors: {
+            onSurfaceVariant: "rgba(255, 255, 255, 0.7)", // Slightly transparent white for placeholder
+            onSurface: "white", // Full white for input text
+          },
+        }}
       />
       <Button
         mode="contained"
         onPress={handleAddEvent}
         loading={loading}
         disabled={loading}
+        style={{ backgroundColor: theme.colors.primary }}
+        labelStyle={{ color: "black" }}
+        textColor="black"
       >
         Add Event
       </Button>
