@@ -1,6 +1,5 @@
 import { Tabs } from "expo-router";
 import { useTheme } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function TabLayout() {
   const theme = useTheme();
@@ -8,12 +7,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.secondary,
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.outline,
-        },
+        tabBarStyle: { display: "none" },
         headerStyle: {
           backgroundColor: theme.colors.surface,
         },
@@ -33,29 +27,8 @@ export default function TabLayout() {
         options={{
           title: "Timeline",
           headerTitle: "TIMELINE",
-          tabBarIcon: ({ color }) => (
-            <TabBarIcon name="timeline" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="addEvent"
-        options={{
-          title: "Add Event",
-          tabBarIcon: ({ color }) => (
-            <TabBarIcon name="plus-circle-outline" color={color} />
-          ),
         }}
       />
     </Tabs>
-  );
-}
-
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-  color: string;
-}) {
-  return (
-    <MaterialCommunityIcons size={24} style={{ marginBottom: -3 }} {...props} />
   );
 }

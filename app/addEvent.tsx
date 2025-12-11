@@ -14,20 +14,27 @@ import {
   useTheme,
   MD3Theme,
   Text,
+  IconButton,
 } from "react-native-paper";
 import { DatePickerModal } from "react-native-paper-dates";
-import { db } from "../../lib/firebase";
+import { db } from "../lib/firebase";
 import { collection, addDoc } from "firebase/firestore";
 import { router } from "expo-router";
 import { format } from "date-fns";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const AddEventScreen = () => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  const handleClose = () => {
+    router.back();
+  };
 
   const handleAddEvent = async () => {
     if (!title || !date) {
@@ -46,14 +53,14 @@ const AddEventScreen = () => {
 
       await addDoc(collection(db, "events"), newEvent);
 
-      // Clear form and show success
+      // Clear form and navigate back
       setTitle("");
       setDate(undefined);
       setDescription("");
       Alert.alert("Success", "Event added successfully!", [
         {
           text: "OK",
-          onPress: () => router.push("/timeline"),
+          onPress: () => router.back(),
         },
       ]);
     } catch (error) {
@@ -71,7 +78,7 @@ const AddEventScreen = () => {
     }
   };
 
-  const styles = makeStyles(theme);
+  const styles = makeStyles(theme, insets.top);
 
   const inputTheme = {
     colors: {
@@ -85,6 +92,18 @@ const AddEventScreen = () => {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      {/* Header with X button */}
+      <View style={styles.header}>
+        <IconButton
+          icon="close"
+          iconColor={theme.colors.primary}
+          size={28}
+          onPress={handleClose}
+        />
+        <Text style={styles.headerTitle}>Add Event</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -164,11 +183,30 @@ const AddEventScreen = () => {
   );
 };
 
-const makeStyles = (theme: MD3Theme) =>
+const makeStyles = (theme: MD3Theme, topInset: number) =>
   StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingTop: topInset,
+      paddingHorizontal: 8,
+      paddingBottom: 8,
+      backgroundColor: theme.colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.outline,
+    },
+    headerTitle: {
+      color: theme.colors.primary,
+      fontSize: 18,
+      fontWeight: "600",
+    },
+    headerSpacer: {
+      width: 48, // Same as IconButton to balance the header
     },
     scrollView: {
       flex: 1,

@@ -30,6 +30,8 @@ import {
 import { Swipeable } from "react-native-gesture-handler";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Define the Event type
 interface Event {
@@ -253,7 +255,7 @@ const TimelineScreen = () => {
         renderItem={renderItem}
         contentContainerStyle={[
           styles.eventList,
-          { flexGrow: 1, justifyContent: "flex-end" },
+          { flexGrow: 1, justifyContent: "flex-end", paddingTop: 80 },
         ]}
         onScrollToIndexFailed={(info) => {
           setTimeout(() => {
@@ -277,6 +279,14 @@ const TimelineScreen = () => {
         style={styles.gradientOverlayBottom}
         pointerEvents="none"
       />
+      {/* Floating Add Event Button */}
+      <TouchableOpacity
+        style={styles.floatingButton}
+        onPress={() => router.push("/addEvent")}
+        activeOpacity={0.8}
+      >
+        <MaterialCommunityIcons name="plus" size={28} color="#FFFFFF" />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -436,6 +446,7 @@ const makeStyles = (theme: MD3Theme) =>
       paddingVertical: 16,
       paddingRight: 16,
       paddingLeft: 26,
+      paddingBottom: 80,
       overflow: "visible",
     },
     card: {
@@ -613,6 +624,26 @@ const makeStyles = (theme: MD3Theme) =>
       fontSize: 12,
       fontWeight: "600",
       marginTop: 4,
+    },
+    // Floating Add Event button
+    floatingButton: {
+      position: "absolute",
+      bottom: 56,
+      right: 32,
+      backgroundColor: "#151515",
+      borderRadius: 9999,
+      width: 56,
+      height: 56,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: "#252525",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+      zIndex: 100,
     },
   });
 
