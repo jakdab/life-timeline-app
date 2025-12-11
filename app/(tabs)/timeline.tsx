@@ -6,19 +6,30 @@ import {
   Text,
   Image,
   TouchableOpacity,
+  Alert,
+  Animated,
 } from "react-native";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useTheme, MD3Theme } from "react-native-paper";
 import {
   format,
   parseISO,
   addDays,
-  subDays,
   startOfToday,
   addMonths,
   subMonths,
 } from "date-fns";
+import { Swipeable } from "react-native-gesture-handler";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 // Define the Event type
 interface Event {
@@ -135,6 +146,15 @@ const TimelineScreen = () => {
     return () => unsubscribe();
   }, []);
 
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+      await deleteDoc(doc(db, "events", eventId));
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      Alert.alert("Error", "Failed to delete event. Please try again.");
+    }
+  };
+
   const styles = makeStyles(theme);
 
   // Group events by month
@@ -183,7 +203,7 @@ const TimelineScreen = () => {
     if (typeof item === "string") {
       return renderMonthSeparator(item);
     }
-    return <EventCard event={item} />;
+    return <EventCard event={item} onDelete={handleDeleteEvent} />;
   };
 
   const handleDateSelect = (date: Date) => {
@@ -245,42 +265,120 @@ const TimelineScreen = () => {
           }, 100);
         }}
       />
+      {/* Gradient Fade Overlay - Top */}
+      <LinearGradient
+        colors={["#0f0f0f", "rgba(15, 15, 15, 0)"]}
+        style={styles.gradientOverlay}
+        pointerEvents="none"
+      />
+      {/* Gradient Fade Overlay - Bottom */}
+      <LinearGradient
+        colors={["rgba(15, 15, 15, 0)", "#0f0f0f"]}
+        style={styles.gradientOverlayBottom}
+        pointerEvents="none"
+      />
     </View>
   );
 };
 
-const EventCard = ({ event }: { event: Event }) => {
+const EventCard = ({
+  event,
+  onDelete,
+}: {
+  event: Event;
+  onDelete: (id: string) => void;
+}) => {
   const theme = useTheme();
   const styles = makeStyles(theme);
+  const swipeableRef = useRef<Swipeable>(null);
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Event",
+      `Are you sure you want to delete "${event.title}"?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => swipeableRef.current?.close(),
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => onDelete(event.id),
+        },
+      ]
+    );
+  };
+
+  const renderRightActions = (
+    progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>
+  ) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [1, 0.5],
+      extrapolate: "clamp",
+    });
+
+    const opacity = dragX.interpolate({
+      inputRange: [-100, -50, 0],
+      outputRange: [1, 0.8, 0],
+      extrapolate: "clamp",
+    });
+
+    return (
+      <TouchableOpacity
+        onPress={handleDelete}
+        style={styles.deleteButtonContainer}
+      >
+        <Animated.View
+          style={[styles.deleteButton, { opacity, transform: [{ scale }] }]}
+        >
+          <MaterialCommunityIcons name="trash-can" size={24} color="white" />
+          <Text style={styles.deleteButtonText}>Delete</Text>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.card}>
-      {/* Date Circle */}
+      {/* Date Circle - stays fixed */}
       <View style={styles.dateCircle}>
         <Text style={styles.dateText}>{new Date(event.date).getDate()}</Text>
       </View>
 
-      {/* Event Content */}
-      <View style={styles.cardContent}>
-        <Text style={styles.eventTitle}>{event.title}</Text>
-        <EventTags tags={event.tags || []} />
-        <Text style={styles.eventDescription} numberOfLines={3}>
-          {event.description || "No description available."}
-        </Text>
+      {/* Swipeable Card Content */}
+      <Swipeable
+        ref={swipeableRef}
+        renderRightActions={renderRightActions}
+        rightThreshold={40}
+        friction={2}
+        overshootRight={false}
+        containerStyle={styles.swipeableContainer}
+      >
+        <View style={styles.cardContent}>
+          <Text style={styles.eventTitle}>{event.title}</Text>
+          <EventTags tags={event.tags || []} />
+          <Text style={styles.eventDescription} numberOfLines={3}>
+            {event.description || "No description available."}
+          </Text>
 
-        {/* Event Images */}
-        {event.images && (
-          <View style={styles.imageRow}>
-            {event.images.map((image, index) => (
-              <Image
-                key={index}
-                style={styles.eventImage}
-                source={{ uri: image }}
-              />
-            ))}
-          </View>
-        )}
-      </View>
+          {/* Event Images */}
+          {event.images && (
+            <View style={styles.imageRow}>
+              {event.images.map((image, index) => (
+                <Image
+                  key={index}
+                  style={styles.eventImage}
+                  source={{ uri: image }}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </Swipeable>
     </View>
   );
 };
@@ -306,6 +404,24 @@ const makeStyles = (theme: MD3Theme) =>
       flex: 1,
       backgroundColor: theme.colors.background,
       position: "relative",
+      overflow: "visible",
+    },
+    gradientOverlay: {
+      position: "absolute",
+      top: 112, // Below the calendar preview
+      left: 0,
+      right: 0,
+      height: 60,
+      zIndex: 50,
+      opacity: 0.8,
+    },
+    gradientOverlayBottom: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 80,
+      zIndex: 50,
     },
     timelineLine: {
       position: "absolute",
@@ -320,6 +436,7 @@ const makeStyles = (theme: MD3Theme) =>
       paddingVertical: 16,
       paddingRight: 16,
       paddingLeft: 26,
+      overflow: "visible",
     },
     card: {
       flexDirection: "row",
@@ -327,6 +444,7 @@ const makeStyles = (theme: MD3Theme) =>
       alignItems: "flex-start",
       position: "relative",
       zIndex: 1,
+      backgroundColor: "transparent",
     },
     dateCircle: {
       width: 48,
@@ -468,6 +586,33 @@ const makeStyles = (theme: MD3Theme) =>
     },
     firstOfMonth: {
       marginLeft: 16,
+    },
+    // Swipeable container
+    swipeableContainer: {
+      flex: 1,
+    },
+    // Delete button styles
+    deleteButtonContainer: {
+      justifyContent: "center",
+      alignItems: "flex-end",
+
+      paddingLeft: 16,
+    },
+    deleteButton: {
+      backgroundColor: "#DC3545",
+      justifyContent: "center",
+      alignItems: "center",
+      width: 80,
+      height: "100%",
+      borderRadius: 12,
+      flexDirection: "column",
+      paddingVertical: 16,
+    },
+    deleteButtonText: {
+      color: "white",
+      fontSize: 12,
+      fontWeight: "600",
+      marginTop: 4,
     },
   });
 
