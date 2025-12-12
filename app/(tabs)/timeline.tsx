@@ -205,7 +205,22 @@ const TimelineScreen = () => {
     if (typeof item === "string") {
       return renderMonthSeparator(item);
     }
-    return <EventCard event={item} onDelete={handleDeleteEvent} />;
+    return <EventCard event={item} onDelete={handleDeleteEvent} onEdit={handleEditEvent} />;
+  };
+
+  const handleEditEvent = (event: Event) => {
+    // Encode images JSON to prevent Firebase Storage URL params from being corrupted
+    const encodedImages = encodeURIComponent(JSON.stringify(event.images || []));
+    router.push({
+      pathname: "/addEvent",
+      params: {
+        eventId: event.id,
+        title: event.title,
+        date: event.date,
+        description: event.description || "",
+        images: encodedImages,
+      },
+    });
   };
 
   const handleDateSelect = (date: Date) => {
@@ -294,9 +309,11 @@ const TimelineScreen = () => {
 const EventCard = ({
   event,
   onDelete,
+  onEdit,
 }: {
   event: Event;
   onDelete: (id: string) => void;
+  onEdit: (event: Event) => void;
 }) => {
   const theme = useTheme();
   const styles = makeStyles(theme);
@@ -321,39 +338,101 @@ const EventCard = ({
     );
   };
 
+  const handleEdit = () => {
+    swipeableRef.current?.close();
+    onEdit(event);
+  };
+
   const renderRightActions = (
     progress: Animated.AnimatedInterpolation<number>,
     dragX: Animated.AnimatedInterpolation<number>
   ) => {
     const scale = dragX.interpolate({
-      inputRange: [-100, 0],
+      inputRange: [-160, 0],
       outputRange: [1, 0.5],
       extrapolate: "clamp",
     });
 
     const opacity = dragX.interpolate({
-      inputRange: [-100, -50, 0],
+      inputRange: [-160, -80, 0],
       outputRange: [1, 0.8, 0],
       extrapolate: "clamp",
     });
 
     return (
-      <TouchableOpacity
-        onPress={handleDelete}
-        style={styles.deleteButtonContainer}
-      >
-        <Animated.View
-          style={[styles.deleteButton, { opacity, transform: [{ scale }] }]}
+      <View style={styles.swipeActionsContainer}>
+        <TouchableOpacity
+          onPress={handleEdit}
+          style={styles.editButtonContainer}
         >
-          <MaterialCommunityIcons name="trash-can" size={24} color="white" />
-          <Text style={styles.deleteButtonText}>Delete</Text>
-        </Animated.View>
-      </TouchableOpacity>
+          <Animated.View
+            style={[styles.editButton, { opacity, transform: [{ scale }] }]}
+          >
+            <MaterialCommunityIcons name="pencil" size={24} color="white" />
+            <Text style={styles.actionButtonText}>Edit</Text>
+          </Animated.View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleDelete}
+          style={styles.deleteButtonContainer}
+        >
+          <Animated.View
+            style={[styles.deleteButton, { opacity, transform: [{ scale }] }]}
+          >
+            <MaterialCommunityIcons name="trash-can" size={24} color="white" />
+            <Text style={styles.actionButtonText}>Delete</Text>
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
     );
   };
 
+  // Check if we have images for the blur background
+  const hasImages = event.images && event.images.length > 0;
+  const firstImage = hasImages ? event.images![0] : null;
+
   return (
     <View style={styles.card}>
+      {/* Blurred Background Image - positioned OUTSIDE card, extends beyond borders */}
+      {/* {firstImage && (
+        <View style={styles.blurImageContainer}>
+          <Image
+            source={{ uri: firstImage }}
+            style={styles.blurImage}
+            contentFit="cover"
+            blurRadius={200}
+          />
+
+          <LinearGradient
+            colors={["rgba(15, 15, 15, 1)", "transparent"]}
+            style={styles.blurFadeTop}
+            pointerEvents="none"
+          />
+
+          <LinearGradient
+            colors={["transparent", "rgba(15, 15, 15, 1)"]}
+            style={styles.blurFadeBottom}
+            pointerEvents="none"
+          />
+
+          <LinearGradient
+            colors={["rgba(15, 15, 15, 1)", "transparent"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.blurFadeLeft}
+            pointerEvents="none"
+          />
+
+          <LinearGradient
+            colors={["transparent", "rgba(15, 15, 15, 1)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.blurFadeRight}
+            pointerEvents="none"
+          />
+        </View>
+      )} */}
+
       {/* Date Circle - stays fixed */}
       <View style={styles.dateCircle}>
         <Text style={styles.dateText}>{new Date(event.date).getDate()}</Text>
@@ -458,6 +537,7 @@ const makeStyles = (theme: MD3Theme) =>
       position: "relative",
       zIndex: 1,
       backgroundColor: "transparent",
+      overflow: "visible",
     },
     dateCircle: {
       width: 48,
@@ -501,6 +581,58 @@ const makeStyles = (theme: MD3Theme) =>
       shadowRadius: 2,
       elevation: 30,
     },
+    // Blur image container - positioned OUTSIDE card, extends beyond borders per Figma
+    // Removed overflow:hidden so blur spreads naturally with smooth edges
+    blurImageContainer: {
+      position: "absolute",
+      top: -20,
+      left: 64, // After date circle (48px) + margin (16px)
+      width: 231,
+      height: 231,
+      zIndex: 0,
+    },
+    // BlurView overlay style
+    blurViewOverlay: {
+      width: "100%",
+      height: "100%",
+      borderRadius: 12,
+      overflow: "hidden",
+    },
+    // Blurred background image with 15% opacity per Figma design
+    blurImage: {
+      width: "100%",
+      height: "100%",
+      opacity: 0.10,
+    },
+    // Gradient fades for smooth blur edges
+    blurFadeTop: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 60,
+    },
+    blurFadeBottom: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 60,
+    },
+    blurFadeLeft: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      width: 60,
+    },
+    blurFadeRight: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      right: 0,
+      width: 60,
+    },
     eventTitle: {
       color: theme.colors.primary,
       fontSize: 16,
@@ -531,7 +663,7 @@ const makeStyles = (theme: MD3Theme) =>
     },
     eventDescription: {
       color: theme.colors.primary,
-      fontSize: 12,
+      fontSize: 14,
       lineHeight: 15.6,
       letterSpacing: 0.12,
       fontFamily: "PPNeueMontreal-Medium",
@@ -613,22 +745,48 @@ const makeStyles = (theme: MD3Theme) =>
     swipeableContainer: {
       flex: 1,
     },
+    // Swipe actions container
+    swipeActionsContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    // Edit button styles
+    editButtonContainer: {
+      justifyContent: "center",
+      alignItems: "center",
+      paddingLeft: 8,
+    },
+    editButton: {
+      backgroundColor: "#4A90D9",
+      justifyContent: "center",
+      alignItems: "center",
+      width: 70,
+      height: "100%",
+      borderRadius: 12,
+      flexDirection: "column",
+      paddingVertical: 16,
+    },
     // Delete button styles
     deleteButtonContainer: {
       justifyContent: "center",
-      alignItems: "flex-end",
-
-      paddingLeft: 16,
+      alignItems: "center",
+      paddingLeft: 8,
     },
     deleteButton: {
       backgroundColor: "#DC3545",
       justifyContent: "center",
       alignItems: "center",
-      width: 80,
+      width: 70,
       height: "100%",
       borderRadius: 12,
       flexDirection: "column",
       paddingVertical: 16,
+    },
+    actionButtonText: {
+      color: "white",
+      fontSize: 12,
+      marginTop: 4,
+      fontFamily: "PPNeueMontreal-Medium",
     },
     deleteButtonText: {
       color: "white",

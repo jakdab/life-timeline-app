@@ -8,6 +8,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Image as RNImage,
+  Dimensions,
 } from "react-native";
 import {
   TextInput,
@@ -19,10 +21,10 @@ import {
 } from "react-native-paper";
 import { DatePickerModal } from "react-native-paper-dates";
 import { db, storage } from "../lib/firebase";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { router } from "expo-router";
-import { format } from "date-fns";
+import { router, useLocalSearchParams } from "expo-router";
+import { format, parseISO } from "date-fns";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
@@ -30,6 +32,16 @@ import { Image } from "expo-image";
 const AddEventScreen = () => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{
+    eventId?: string;
+    title?: string;
+    date?: string;
+    description?: string;
+    images?: string;
+  }>();
+  
+  const isEditMode = !!params.eventId;
+  
   const [title, setTitle] = useState("");
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [description, setDescription] = useState("");
@@ -37,6 +49,30 @@ const AddEventScreen = () => {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Pre-populate form if in edit mode
+  useEffect(() => {
+    if (isEditMode && params.title) {
+      setTitle(params.title);
+      if (params.date) {
+        setDate(parseISO(params.date));
+      }
+      setDescription(params.description || "");
+      if (params.images) {
+        try {
+          // First decode the URI-encoded JSON string, then parse it
+          const decodedString = decodeURIComponent(params.images);
+          console.log("Decoded images string:", decodedString);
+          const parsedImages = JSON.parse(decodedString);
+          console.log("Parsed images:", parsedImages);
+          setPhotos(parsedImages);
+        } catch (e) {
+          console.log("Error parsing images:", e);
+          setPhotos([]);
+        }
+      }
+    }
+  }, [isEditMode, params.title, params.date, params.description, params.images]);
 
   // Track keyboard height for dynamic button positioning
   useEffect(() => {
@@ -130,34 +166,50 @@ const AddEventScreen = () => {
     try {
       setLoading(true);
       
-      // Generate a unique event ID for organizing uploads
-      const eventId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // For uploads, use existing event ID or generate new one
+      const uploadEventId = params.eventId || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Upload all photos and get their download URLs
-      let uploadedImageUrls: string[] = [];
+      // Upload new photos (those that don't start with https://)
+      // Keep existing URLs as-is
+      let finalImageUrls: string[] = [];
       if (photos.length > 0) {
-        const uploadPromises = photos.map((photo, index) => 
-          uploadImage(photo, eventId, index)
-        );
-        uploadedImageUrls = await Promise.all(uploadPromises);
+        const uploadPromises = photos.map(async (photo, index) => {
+          if (photo.startsWith("https://")) {
+            // Already uploaded to Firebase Storage, keep URL
+            return photo;
+          } else {
+            // New local photo, upload it
+            return await uploadImage(photo, uploadEventId, index);
+          }
+        });
+        finalImageUrls = await Promise.all(uploadPromises);
       }
       
-      const newEvent = {
+      const eventData = {
         title,
         date: format(date, "yyyy-MM-dd"),
         description: description || "",
-        images: uploadedImageUrls,
-        createdAt: new Date().toISOString(),
+        images: finalImageUrls,
+        ...(isEditMode ? {} : { createdAt: new Date().toISOString() }),
       };
 
-      await addDoc(collection(db, "events"), newEvent);
+      if (isEditMode && params.eventId) {
+        // Update existing event
+        await updateDoc(doc(db, "events", params.eventId), eventData);
+      } else {
+        // Create new event
+        await addDoc(collection(db, "events"), {
+          ...eventData,
+          createdAt: new Date().toISOString(),
+        });
+      }
 
       // Clear form and navigate back
       setTitle("");
       setDate(undefined);
       setDescription("");
       setPhotos([]);
-      Alert.alert("Success", "Event added successfully!", [
+      Alert.alert("Success", isEditMode ? "Event updated successfully!" : "Event added successfully!", [
         {
           text: "OK",
           onPress: () => router.back(),
@@ -201,7 +253,7 @@ const AddEventScreen = () => {
           size={28}
           onPress={handleClose}
         />
-        <Text style={styles.headerTitle}>Add Event</Text>
+        <Text style={styles.headerTitle}>{isEditMode ? "Edit Event" : "Add Event"}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -288,10 +340,10 @@ const AddEventScreen = () => {
           {/* Photo Thumbnails */}
           {photos.map((photo, index) => (
             <View key={index} style={styles.photoThumbnail}>
-              <Image
+              <RNImage
                 source={{ uri: photo }}
                 style={styles.photoImage}
-                contentFit="cover"
+                resizeMode="cover"
               />
               <TouchableOpacity
                 style={styles.removePhotoButton}
@@ -320,12 +372,18 @@ const AddEventScreen = () => {
           labelStyle={styles.buttonLabel}
           textColor="black"
         >
-          Add Event
+          {isEditMode ? "Save Changes" : "Add Event"}
         </Button>
       </View>
     </KeyboardAvoidingView>
   );
 };
+
+// Calculate photo thumbnail size based on screen width
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const PHOTO_GAP = 16;
+const PHOTO_PADDING = 40; // 20px padding on each side
+const PHOTO_SIZE = Math.floor((SCREEN_WIDTH - PHOTO_PADDING - (2 * PHOTO_GAP)) / 3);
 
 const makeStyles = (theme: MD3Theme, topInset: number) =>
   StyleSheet.create({
@@ -377,19 +435,19 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
     photosGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 16,
+      gap: PHOTO_GAP,
       marginBottom: 16,
     },
     photoThumbnail: {
-      width: "30%",
-      aspectRatio: 1,
+      width: PHOTO_SIZE,
+      height: PHOTO_SIZE,
       borderRadius: 8,
       overflow: "hidden",
       position: "relative",
     },
     photoImage: {
-      width: "100%",
-      height: "100%",
+      width: PHOTO_SIZE,
+      height: PHOTO_SIZE,
       borderRadius: 8,
     },
     removePhotoButton: {
