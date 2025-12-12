@@ -4,11 +4,11 @@ import {
   FlatList,
   StyleSheet,
   Text,
-  Image,
   TouchableOpacity,
   Alert,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import {
   collection,
   onSnapshot,
@@ -371,22 +371,24 @@ const EventCard = ({
         <View style={styles.cardContent}>
           <Text style={styles.eventTitle}>{event.title}</Text>
           <EventTags tags={event.tags || []} />
-          <Text style={styles.eventDescription} numberOfLines={3}>
-            {event.description || "No description available."}
-          </Text>
 
-          {/* Event Images */}
-          {event.images && (
+          {/* Photo Row - after tags, before description per Figma */}
+          {event.images && event.images.length > 0 && (
             <View style={styles.imageRow}>
               {event.images.map((image, index) => (
                 <Image
                   key={index}
                   style={styles.eventImage}
                   source={{ uri: image }}
+                  contentFit="cover"
                 />
               ))}
             </View>
           )}
+
+          <Text style={styles.eventDescription} numberOfLines={3}>
+            {event.description || "No description available."}
+          </Text>
         </View>
       </Swipeable>
     </View>
@@ -461,7 +463,7 @@ const makeStyles = (theme: MD3Theme) =>
       width: 48,
       height: 48,
       borderRadius: 24,
-      backgroundColor: "rgba(17, 16, 16, 0.2)",
+      backgroundColor: "#121111",
       justifyContent: "center",
       alignItems: "center",
       borderWidth: 1,
@@ -532,18 +534,17 @@ const makeStyles = (theme: MD3Theme) =>
       fontSize: 12,
       lineHeight: 15.6,
       letterSpacing: 0.12,
-      marginBottom: 8,
       fontFamily: "PPNeueMontreal-Medium",
     },
     imageRow: {
       flexDirection: "row",
-      marginTop: 8,
+      gap: 8,
+      marginBottom: 8,
     },
     eventImage: {
       width: 48,
       height: 48,
       borderRadius: 8,
-      marginRight: 8,
     },
     monthSeparator: {
       paddingVertical: 16,
