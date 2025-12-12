@@ -461,7 +461,7 @@ const makeStyles = (theme: MD3Theme) =>
       width: 48,
       height: 48,
       borderRadius: 24,
-      backgroundColor: "#121111",
+      backgroundColor: "rgba(17, 16, 16, 0.2)",
       justifyContent: "center",
       alignItems: "center",
       borderWidth: 1,
@@ -478,12 +478,13 @@ const makeStyles = (theme: MD3Theme) =>
       elevation: 30,
     },
     dateText: {
-      color: theme.colors.primary,
+      color: "#E6E6E6",
       fontSize: 16,
+      fontFamily: "PPNeueMontreal-Medium",
     },
     cardContent: {
       flex: 1,
-      backgroundColor: "#121111",
+      backgroundColor: "rgba(17, 16, 16, 0.2)",
       borderRadius: 12,
       padding: 16,
       borderWidth: 1,
@@ -501,7 +502,9 @@ const makeStyles = (theme: MD3Theme) =>
     eventTitle: {
       color: theme.colors.primary,
       fontSize: 16,
+      lineHeight: 20.8,
       marginBottom: 8,
+      fontFamily: "PPNeueMontreal-Medium",
     },
     tagsContainer: {
       flexDirection: "row",
@@ -522,11 +525,15 @@ const makeStyles = (theme: MD3Theme) =>
       color: theme.colors.secondary,
       fontSize: 10,
       textTransform: "uppercase",
+      fontFamily: "PPNeueMontreal-Medium",
     },
     eventDescription: {
-      color: theme.colors.secondary,
+      color: theme.colors.primary,
       fontSize: 12,
+      lineHeight: 15.6,
+      letterSpacing: 0.12,
       marginBottom: 8,
+      fontFamily: "PPNeueMontreal-Medium",
     },
     imageRow: {
       flexDirection: "row",
@@ -547,7 +554,8 @@ const makeStyles = (theme: MD3Theme) =>
     monthText: {
       color: theme.colors.primary,
       fontSize: 20,
-      fontWeight: "bold",
+      fontWeight: "medium",
+      fontFamily: "PPNeueMontreal-Medium",
     },
     calendarContainer: {
       paddingTop: 16,
@@ -562,9 +570,9 @@ const makeStyles = (theme: MD3Theme) =>
     calendarTitle: {
       color: theme.colors.primary,
       fontSize: 16,
-      fontWeight: "bold",
       textAlign: "center",
       marginBottom: 16,
+      fontFamily: "PPNeueMontreal-Medium",
     },
     daysRow: {
       paddingHorizontal: 16,
@@ -587,10 +595,12 @@ const makeStyles = (theme: MD3Theme) =>
       color: "#C1C1C1",
       fontSize: 12,
       marginBottom: 4,
+      fontFamily: "PPNeueMontreal-Medium",
     },
     dayNumber: {
       color: "#E6E6E6",
       fontSize: 12,
+      fontFamily: "PPNeueMontreal-Medium",
     },
     todayText: {
       color: "#E6E6E6",
@@ -622,8 +632,8 @@ const makeStyles = (theme: MD3Theme) =>
     deleteButtonText: {
       color: "white",
       fontSize: 12,
-      fontWeight: "600",
       marginTop: 4,
+      fontFamily: "PPNeueMontreal-Medium",
     },
     // Floating Add Event button
     floatingButton: {

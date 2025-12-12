@@ -13,6 +13,9 @@ export default function TabLayout() {
         },
         headerTitleStyle: {
           color: theme.colors.primary,
+          fontFamily: "PPNeueMontreal-Medium",
+          fontSize: 16,
+          letterSpacing: 0.64,
         },
       }}
     >

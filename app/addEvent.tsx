@@ -203,7 +203,7 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
     headerTitle: {
       color: theme.colors.primary,
       fontSize: 18,
-      fontWeight: "600",
+      fontFamily: "PPNeueMontreal-Medium",
     },
     headerSpacer: {
       width: 48, // Same as IconButton to balance the header
@@ -218,9 +218,9 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
     label: {
       color: theme.colors.primary,
       fontSize: 14,
-      fontWeight: "600",
       marginBottom: 8,
       marginTop: 8,
+      fontFamily: "PPNeueMontreal-Medium",
     },
     input: {
       marginBottom: 16,
@@ -236,7 +236,7 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
     },
     buttonLabel: {
       color: "black",
-      fontWeight: "600",
+      fontFamily: "PPNeueMontreal-Medium",
     },
   });
 
