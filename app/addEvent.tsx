@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -28,6 +28,17 @@ import { format, parseISO } from "date-fns";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
+import DraggableFlatList, {
+  ScaleDecorator,
+  RenderItemParams,
+} from "react-native-draggable-flatlist";
+import * as Haptics from "expo-haptics";
+
+// Type for photo items in the draggable list
+type PhotoItem = {
+  id: string;
+  uri: string;
+};
 
 const AddEventScreen = () => {
   const theme = useTheme();
@@ -232,6 +243,43 @@ const AddEventScreen = () => {
 
   const styles = makeStyles(theme, insets.top);
 
+  // Render function for draggable photo items
+  const renderPhotoItem = useCallback(
+    ({ item, drag, isActive }: RenderItemParams<PhotoItem>) => {
+      const index = photos.findIndex((p) => p === item.uri);
+      return (
+        <ScaleDecorator>
+          <TouchableOpacity
+            onLongPress={drag}
+            disabled={isActive}
+            style={[
+              styles.photoThumbnail,
+              isActive && styles.photoThumbnailActive,
+            ]}
+          >
+            <RNImage
+              source={{ uri: item.uri }}
+              style={styles.photoImage}
+              resizeMode="cover"
+            />
+            <TouchableOpacity
+              style={styles.removePhotoButton}
+              onPress={() => removePhoto(index)}
+            >
+              <IconButton
+                icon="close"
+                iconColor="#FFFFFF"
+                size={12}
+                style={styles.removeIcon}
+              />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </ScaleDecorator>
+      );
+    },
+    [photos]
+  );
+
   const inputTheme = {
     colors: {
       onSurfaceVariant: "rgba(255, 255, 255, 0.7)",
@@ -322,21 +370,6 @@ const AddEventScreen = () => {
         {/* Photos Section */}
         <Text style={styles.label}>Photos (max 6)</Text>
         <View style={styles.photosGrid}>
-          {/* Add Photo Button - first slot */}
-          {photos.length < 6 && (
-            <TouchableOpacity
-              style={styles.addPhotoButton}
-              onPress={pickPhotos}
-              disabled={loading}
-            >
-              <IconButton
-                icon="plus"
-                iconColor={theme.colors.primary}
-                size={24}
-              />
-            </TouchableOpacity>
-          )}
-
           {/* Photo Thumbnails */}
           {photos.map((photo, index) => (
             <View key={index} style={styles.photoThumbnail}>
@@ -358,6 +391,21 @@ const AddEventScreen = () => {
               </TouchableOpacity>
             </View>
           ))}
+
+          {/* Add Photo Button - after photos */}
+          {photos.length < 6 && (
+            <TouchableOpacity
+              style={styles.addPhotoButton}
+              onPress={pickPhotos}
+              disabled={loading}
+            >
+              <IconButton
+                icon="plus"
+                iconColor={theme.colors.primary}
+                size={24}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
@@ -416,7 +464,7 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
     scrollContent: {
       padding: 20,
       paddingTop: 8,
-      paddingBottom: 20,
+      paddingBottom: 120,
     },
     label: {
       color: theme.colors.primary,
@@ -466,8 +514,8 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
       padding: 0,
     },
     addPhotoButton: {
-      width: "30%",
-      aspectRatio: 1,
+      width: PHOTO_SIZE,
+      height: PHOTO_SIZE,
       borderRadius: 8,
       borderWidth: 1,
       borderColor: theme.colors.outline,
@@ -475,6 +523,25 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
       justifyContent: "center",
       alignItems: "center",
       backgroundColor: theme.colors.surface,
+    },
+    addPhotoButtonInline: {
+      marginLeft: PHOTO_GAP,
+    },
+    photosContainer: {
+      marginBottom: 16,
+    },
+    photoThumbnailActive: {
+      opacity: 0.9,
+      shadowColor: theme.colors.primary,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: 10,
+      elevation: 10,
+    },
+    draggableContent: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: PHOTO_GAP,
     },
     buttonContainer: {
       position: "absolute",

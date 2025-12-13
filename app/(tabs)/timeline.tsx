@@ -526,9 +526,12 @@ const EventCard = ({
             </View>
           )}
 
-          <Text style={styles.eventDescription} numberOfLines={3}>
-            {event.description || "No description available."}
-          </Text>
+          {/* Description - only show if available */}
+          {event.description && event.description.trim() !== "" && (
+            <Text style={styles.eventDescription} numberOfLines={3}>
+              {event.description}
+            </Text>
+          )}
         </View>
       </Swipeable>
     </View>
@@ -703,7 +706,6 @@ const makeStyles = (theme: MD3Theme) =>
       color: theme.colors.primary,
       fontSize: 16,
       lineHeight: 20.8,
-      marginBottom: 8,
       fontFamily: "PPNeueMontreal-Medium",
     },
     tagsContainer: {
@@ -733,11 +735,12 @@ const makeStyles = (theme: MD3Theme) =>
       lineHeight: 15.6,
       letterSpacing: 0.12,
       fontFamily: "PPNeueMontreal-Medium",
+      marginTop: 8,
     },
     imageRow: {
       flexDirection: "row",
       gap: 8,
-      marginBottom: 8,
+      marginTop: 8,
     },
     eventImage: {
       width: 48,
