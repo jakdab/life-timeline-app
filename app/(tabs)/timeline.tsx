@@ -510,7 +510,9 @@ const EventCard = ({
       >
         <View style={styles.cardContent}>
           <Text style={styles.eventTitle}>{event.title}</Text>
-          <EventTags tags={event.tags || []} />
+          {event.tags && event.tags.length > 0 && (
+            <EventTags tags={event.tags} />
+          )}
 
           {/* Photo Row - after tags, before description per Figma */}
           {event.images && event.images.length > 0 && (
@@ -711,7 +713,7 @@ const makeStyles = (theme: MD3Theme) =>
     tagsContainer: {
       flexDirection: "row",
       flexWrap: "wrap",
-      marginBottom: 8,
+      marginTop: 8,
     },
     tag: {
       backgroundColor: theme.colors.surface,
