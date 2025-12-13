@@ -32,6 +32,63 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import MaskedView from "@react-native-masked-view/masked-view";
+import Svg, { Defs, RadialGradient, Stop, Rect } from "react-native-svg";
+
+// Custom hook to calculate image brightness and return appropriate opacity
+// FUTURE IMPLEMENTATION: Uncomment when not using Expo Go (requires dev build)
+// ============================================================================
+// import { getColors } from "react-native-image-colors";
+//
+// const useImageBrightness = (imageUrl: string | null) => {
+//   const [opacity, setOpacity] = useState(0.10);
+//
+//   useEffect(() => {
+//     if (!imageUrl) return;
+//
+//     const calculateBrightness = async () => {
+//       try {
+//         const colors = await getColors(imageUrl, {
+//           fallback: "#000000",
+//           cache: true,
+//           key: imageUrl,
+//         });
+//
+//         let dominantHex = "#808080";
+//         if (colors.platform === "ios") {
+//           dominantHex = colors.background || colors.primary || "#808080";
+//         } else if (colors.platform === "android") {
+//           dominantHex = colors.dominant || colors.average || "#808080";
+//         } else if (colors.platform === "web") {
+//           dominantHex = colors.dominant || colors.vibrant || "#808080";
+//         }
+//
+//         const hex = dominantHex.replace("#", "");
+//         const r = parseInt(hex.substring(0, 2), 16);
+//         const g = parseInt(hex.substring(2, 4), 16);
+//         const b = parseInt(hex.substring(4, 6), 16);
+//
+//         // Luminance formula: 0.299*R + 0.587*G + 0.114*B
+//         const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+//         // Dark image (< 128): higher opacity, Light image (>= 128): lower opacity
+//         const calculatedOpacity = luminance < 128 ? 0.21 : 0.08;
+//         setOpacity(calculatedOpacity);
+//       } catch (error) {
+//         setOpacity(0.10);
+//       }
+//     };
+//     calculateBrightness();
+//   }, [imageUrl]);
+//
+//   return opacity;
+// };
+// ============================================================================
+
+// Current simple implementation (works with Expo Go)
+const useImageBrightness = (_imageUrl: string | null) => {
+  // Static opacity - middle ground between dark (0.21) and light (0.08)
+  return 0.12;
+};
 
 // Define the Event type
 interface Event {
@@ -266,6 +323,7 @@ const TimelineScreen = () => {
         ref={timelineRef}
         data={flatListData}
         inverted
+        showsVerticalScrollIndicator={false}
         keyExtractor={(item) => (typeof item === "string" ? item : item.id)}
         renderItem={renderItem}
         contentContainerStyle={[
@@ -390,48 +448,51 @@ const EventCard = ({
   // Check if we have images for the blur background
   const hasImages = event.images && event.images.length > 0;
   const firstImage = hasImages ? event.images![0] : null;
+  
+  // Get dynamic opacity based on image brightness
+  const blurOpacity = useImageBrightness(firstImage);
 
   return (
     <View style={styles.card}>
-      {/* Blurred Background Image - positioned OUTSIDE card, extends beyond borders */}
-      {/* {firstImage && (
+      {/* Blurred Background Image with MaskedView for smooth edges */}
+      {firstImage && (
         <View style={styles.blurImageContainer}>
-          <Image
-            source={{ uri: firstImage }}
-            style={styles.blurImage}
-            contentFit="cover"
-            blurRadius={200}
-          />
-
-          <LinearGradient
-            colors={["rgba(15, 15, 15, 1)", "transparent"]}
-            style={styles.blurFadeTop}
-            pointerEvents="none"
-          />
-
-          <LinearGradient
-            colors={["transparent", "rgba(15, 15, 15, 1)"]}
-            style={styles.blurFadeBottom}
-            pointerEvents="none"
-          />
-
-          <LinearGradient
-            colors={["rgba(15, 15, 15, 1)", "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.blurFadeLeft}
-            pointerEvents="none"
-          />
-
-          <LinearGradient
-            colors={["transparent", "rgba(15, 15, 15, 1)"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.blurFadeRight}
-            pointerEvents="none"
-          />
+          <MaskedView
+            style={styles.maskedView}
+            maskElement={
+              <Svg width="100%" height="100%">
+                <Defs>
+                  <RadialGradient
+                    id="fadeGradient"
+                    cx="50%"
+                    cy="50%"
+                    rx="50%"
+                    ry="50%"
+                  >
+                    <Stop offset="0%" stopColor="white" stopOpacity="1" />
+                    <Stop offset="40%" stopColor="white" stopOpacity="0.8" />
+                    <Stop offset="100%" stopColor="white" stopOpacity="0" />
+                  </RadialGradient>
+                </Defs>
+                <Rect
+                  x="0"
+                  y="0"
+                  width="100%"
+                  height="100%"
+                  fill="url(#fadeGradient)"
+                />
+              </Svg>
+            }
+          >
+            <Image
+              source={{ uri: firstImage }}
+              style={[styles.blurImage, { opacity: blurOpacity }]}
+              contentFit="cover"
+              blurRadius={400}
+            />
+          </MaskedView>
         </View>
-      )} */}
+      )}
 
       {/* Date Circle - stays fixed */}
       <View style={styles.dateCircle}>
@@ -585,11 +646,16 @@ const makeStyles = (theme: MD3Theme) =>
     // Removed overflow:hidden so blur spreads naturally with smooth edges
     blurImageContainer: {
       position: "absolute",
-      top: -20,
-      left: 64, // After date circle (48px) + margin (16px)
-      width: 231,
-      height: 231,
+      top: -64,
+      left: 24, // After date circle (48px) + margin (16px)
+      width: 288,
+      height: 288,
       zIndex: 0,
+    },
+    // MaskedView style for soft blur edges
+    maskedView: {
+      width: "100%",
+      height: "100%",
     },
     // BlurView overlay style
     blurViewOverlay: {
@@ -602,7 +668,7 @@ const makeStyles = (theme: MD3Theme) =>
     blurImage: {
       width: "100%",
       height: "100%",
-      opacity: 0.10,
+      opacity: 0.07,
     },
     // Gradient fades for smooth blur edges
     blurFadeTop: {
