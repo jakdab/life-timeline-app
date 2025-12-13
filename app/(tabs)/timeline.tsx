@@ -28,6 +28,7 @@ import {
   subMonths,
 } from "date-fns";
 import { Swipeable } from "react-native-gesture-handler";
+import { useLocalSearchParams } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -183,6 +184,7 @@ const TimelineScreen = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   const timelineRef = useRef<FlatList>(null);
+  const params = useLocalSearchParams<{ scrollToDate?: string }>();
 
   useEffect(() => {
     // Changed to ascending order (oldest first)
@@ -204,6 +206,69 @@ const TimelineScreen = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // Auto-scroll to event when scrollToDate param is provided
+  useEffect(() => {
+    if (params.scrollToDate && events.length > 0) {
+      // Find the index of the newest event on the target date
+      // (which will be the last one with that date due to our sorting)
+      const targetDate = params.scrollToDate;
+      
+      // Build flatListData to find correct index
+      const tempGroupedEvents = events.reduce(
+        (groups: { [key: string]: Event[] }, event) => {
+          const date = parseISO(event.date);
+          const monthYear = format(date, "MMMM yyyy");
+          if (!groups[monthYear]) {
+            groups[monthYear] = [];
+          }
+          groups[monthYear].push(event);
+          return groups;
+        },
+        {}
+      );
+
+      Object.keys(tempGroupedEvents).forEach((month) => {
+        tempGroupedEvents[month].sort((a, b) => {
+          const dateCompare = parseISO(b.date).getTime() - parseISO(a.date).getTime();
+          if (dateCompare !== 0) return dateCompare;
+          const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return aCreated - bCreated;
+        });
+      });
+
+      const sortedMonths = Object.keys(tempGroupedEvents).sort((a, b) => {
+        return (
+          parseISO(tempGroupedEvents[b][0].date).getTime() -
+          parseISO(tempGroupedEvents[a][0].date).getTime()
+        );
+      });
+
+      const tempFlatListData = sortedMonths.flatMap((month) => [
+        ...tempGroupedEvents[month],
+        month,
+      ]);
+
+      // Find last event with target date (the newest one for that day)
+      let lastMatchIndex = -1;
+      tempFlatListData.forEach((item, index) => {
+        if (typeof item !== "string" && item.date === targetDate) {
+          lastMatchIndex = index;
+        }
+      });
+
+      if (lastMatchIndex !== -1) {
+        setTimeout(() => {
+          timelineRef.current?.scrollToIndex({
+            index: lastMatchIndex,
+            animated: true,
+            viewPosition: 0.5,
+          });
+        }, 300);
+      }
+    }
+  }, [params.scrollToDate, events]);
 
   const handleDeleteEvent = async (eventId: string) => {
     try {

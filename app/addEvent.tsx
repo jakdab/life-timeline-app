@@ -215,17 +215,18 @@ const AddEventScreen = () => {
         });
       }
 
-      // Clear form and navigate back
+      // Clear form and navigate back to timeline with the event date
+      const savedDate = format(date, "yyyy-MM-dd");
       setTitle("");
       setDate(undefined);
       setDescription("");
       setPhotos([]);
-      Alert.alert("Success", isEditMode ? "Event updated successfully!" : "Event added successfully!", [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]);
+      
+      // Navigate to timeline with scrollToDate parameter
+      router.replace({
+        pathname: "/(tabs)/timeline",
+        params: { scrollToDate: savedDate },
+      });
     } catch (error) {
       console.error("Error adding event:", error);
       Alert.alert("Error", "Failed to add event. Please try again.");
