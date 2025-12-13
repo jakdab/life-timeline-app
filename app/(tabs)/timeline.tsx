@@ -232,9 +232,15 @@ const TimelineScreen = () => {
   );
 
   // Sort events within each month in reverse chronological order
+  // For same-day events, sort by createdAt in ASCENDING order (older first, newer below)
   Object.keys(groupedEvents).forEach((month) => {
     groupedEvents[month].sort((a, b) => {
-      return parseISO(b.date).getTime() - parseISO(a.date).getTime();
+      const dateCompare = parseISO(b.date).getTime() - parseISO(a.date).getTime();
+      if (dateCompare !== 0) return dateCompare;
+      // Same day: sort by createdAt ascending (older events first, newer below)
+      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return aCreated - bCreated;
     });
   });
 
