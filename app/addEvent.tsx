@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
   Alert,
-  ScrollView,
   TouchableOpacity,
-  KeyboardAvoidingView,
   Platform,
   Keyboard,
   Image as RNImage,
   Dimensions,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   TextInput,
   Button,
@@ -28,6 +27,7 @@ import { format, parseISO } from "date-fns";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import DraggableFlatList, {
   ScaleDecorator,
   RenderItemParams,
@@ -60,6 +60,8 @@ const AddEventScreen = () => {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef<any>(null);
+  const descriptionInputRef = useRef<any>(null);
 
   // Pre-populate form if in edit mode
   useEffect(() => {
@@ -289,11 +291,7 @@ const AddEventScreen = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={48}
-    >
+    <View style={styles.container}>
       {/* Header with X button */}
       <View style={styles.header}>
         <IconButton
@@ -306,10 +304,15 @@ const AddEventScreen = () => {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView
+      <KeyboardAwareScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        enableOnAndroid={true}
+        extraScrollHeight={150}
+        enableAutomaticScroll={true}
+        keyboardOpeningTime={0}
       >
         {/* Title Input */}
         <Text style={styles.label}>Event Title</Text>
@@ -356,6 +359,7 @@ const AddEventScreen = () => {
         {/* Description Input */}
         <Text style={styles.label}>Description</Text>
         <TextInput
+          ref={descriptionInputRef}
           style={[styles.input, styles.descriptionInput]}
           mode="outlined"
           placeholder="Enter event description (optional)"
@@ -366,6 +370,12 @@ const AddEventScreen = () => {
           theme={inputTheme}
           multiline
           numberOfLines={5}
+          onFocus={() => {
+            // Manually scroll to this input on focus
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToPosition(0, 210, true);
+            }, 100);
+          }}
         />
 
         {/* Photos Section */}
@@ -408,7 +418,17 @@ const AddEventScreen = () => {
             </TouchableOpacity>
           )}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
+
+      {/* Gradient Fade Overlay - Bottom (below save button, above content) */}
+      <LinearGradient
+        colors={["rgba(15, 15, 15, 0)", "#0f0f0f"]}
+        style={[
+          styles.gradientOverlayBottom,
+          { bottom: keyboardHeight > 0 ? keyboardHeight : 0 }
+        ]}
+        pointerEvents="none"
+      />
 
       {/* Fixed Bottom Button */}
       <View style={[styles.buttonContainer, { bottom: keyboardHeight > 0 ? keyboardHeight : 0, paddingBottom: keyboardHeight > 0 ? 24 : 56 }]}>
@@ -424,7 +444,7 @@ const AddEventScreen = () => {
           {isEditMode ? "Save Changes" : "Add Event"}
         </Button>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -544,14 +564,22 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
       flexWrap: "wrap",
       gap: PHOTO_GAP,
     },
+    gradientOverlayBottom: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      height: 200,
+      zIndex: 1,
+    },
     buttonContainer: {
       position: "absolute",
       bottom: 0,
       left: 0,
       right: 0,
-      paddingHorizontal: 20,
+      paddingHorizontal: 32,
       paddingTop: 16,
       paddingBottom: 24,
+      zIndex: 2,
     },
     button: {
       backgroundColor: theme.colors.primary,

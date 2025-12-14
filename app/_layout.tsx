@@ -5,7 +5,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
+import { View } from "react-native";
 import { darkTheme } from "../styles/theme";
+import NoiseOverlay from "../components/NoiseOverlay";
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -112,22 +114,27 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PaperProvider theme={theme}>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: darkTheme.background },
-            headerTintColor: darkTheme.textPrimary,
-          }}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="addEvent"
-            options={{
-              presentation: "modal",
-              headerShown: false,
+        <View style={{ flex: 1 }}>
+          <StatusBar style="light" />
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: darkTheme.background },
+              headerTintColor: darkTheme.textPrimary,
             }}
-          />
-        </Stack>
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="addEvent"
+              options={{
+                presentation: "modal",
+                headerShown: false,
+              }}
+            />
+          </Stack>
+          {/* Global noise texture overlay - visual only, doesn't block touches */}
+          {/* Settings: 30% opacity, Multiply blend mode, 50% scale pattern */}
+          <NoiseOverlay opacity={0.3} />
+        </View>
       </PaperProvider>
     </GestureHandlerRootView>
   );
