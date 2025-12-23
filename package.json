@@ -58,6 +58,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",
+    "@types/color": "^4.2.0",
     "@types/jest": "^29.5.12",
     "@types/react-native": "^0.73.0",
     "@types/react-navigation": "^3.4.0",

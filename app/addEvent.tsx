@@ -11,13 +11,13 @@ import {
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
-  TextInput,
   Button,
   useTheme,
   MD3Theme,
   Text,
   IconButton,
 } from "react-native-paper";
+import CustomTextInput from "../components/CustomTextInput";
 import { DatePickerModal } from "react-native-paper-dates";
 import { db, storage } from "../lib/firebase";
 import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
@@ -283,12 +283,6 @@ const AddEventScreen = () => {
     [photos]
   );
 
-  const inputTheme = {
-    colors: {
-      onSurfaceVariant: "rgba(255, 255, 255, 0.7)",
-      onSurface: "white",
-    },
-  };
 
   return (
     <View style={styles.container}>
@@ -313,36 +307,29 @@ const AddEventScreen = () => {
         extraScrollHeight={150}
         enableAutomaticScroll={true}
         keyboardOpeningTime={0}
+        showsVerticalScrollIndicator={false}
       >
         {/* Title Input */}
-        <Text style={styles.label}>Event Title</Text>
-        <TextInput
-          style={styles.input}
-          mode="outlined"
+        <CustomTextInput
+          label="Event Title"
           placeholder="Enter event title"
           value={title}
           onChangeText={setTitle}
           disabled={loading}
-          textColor="white"
-          theme={inputTheme}
         />
 
         {/* Date Picker */}
-        <Text style={styles.label}>Event Date</Text>
         <TouchableOpacity
           onPress={() => setDatePickerOpen(true)}
           disabled={loading}
         >
           <View pointerEvents="none">
-            <TextInput
-              style={styles.input}
-              mode="outlined"
+            <CustomTextInput
+              label="Event Date"
               placeholder="Select a date"
               value={date ? format(date, "MMMM d, yyyy") : ""}
               editable={false}
-              textColor="white"
-              theme={inputTheme}
-              right={<TextInput.Icon icon="calendar" color="white" />}
+              rightIcon="calendar"
             />
           </View>
         </TouchableOpacity>
@@ -357,23 +344,19 @@ const AddEventScreen = () => {
         />
 
         {/* Description Input */}
-        <Text style={styles.label}>Description</Text>
-        <TextInput
+        <CustomTextInput
           ref={descriptionInputRef}
-          style={[styles.input, styles.descriptionInput]}
-          mode="outlined"
+          label="Description"
           placeholder="Enter event description (optional)"
           value={description}
           onChangeText={setDescription}
           disabled={loading}
-          textColor="white"
-          theme={inputTheme}
           multiline
           numberOfLines={5}
           onFocus={() => {
             // Manually scroll to this input on focus
             setTimeout(() => {
-              scrollViewRef.current?.scrollToPosition(0, 210, true);
+              scrollViewRef.current?.scrollToPosition(0, 180, true);
             }, 100);
           }}
         />
@@ -484,22 +467,16 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
     },
     scrollContent: {
       padding: 20,
-      paddingTop: 8,
+      paddingTop: 24,
       paddingBottom: 120,
     },
     label: {
-      color: theme.colors.primary,
+      fontFamily: "PPNeueMontreal-Book",
       fontSize: 14,
-      marginBottom: 8,
-      marginTop: 8,
-      fontFamily: "PPNeueMontreal-Medium",
-    },
-    input: {
-      marginBottom: 16,
-      backgroundColor: theme.colors.surface,
-    },
-    descriptionInput: {
-      minHeight: 120,
+      lineHeight: 18,
+      letterSpacing: 0.14,
+      color: "#e8e8eb",
+      marginBottom: 4,
     },
     photosGrid: {
       flexDirection: "row",
@@ -537,13 +514,13 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
     addPhotoButton: {
       width: PHOTO_SIZE,
       height: PHOTO_SIZE,
-      borderRadius: 8,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.colors.outline,
       borderStyle: "dashed",
       justifyContent: "center",
       alignItems: "center",
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "#121111",
     },
     addPhotoButtonInline: {
       marginLeft: PHOTO_GAP,
