@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Alert,
   Animated,
+  Keyboard,
+  Platform,
+  Easing,
 } from "react-native";
 import { Image } from "expo-image";
 import {
@@ -35,6 +38,7 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MaskedView from "@react-native-masked-view/masked-view";
 import Svg, { Defs, RadialGradient, Stop, Rect } from "react-native-svg";
+import TimelineHeader from "../../components/TimelineHeader";
 
 // Custom hook to calculate image brightness and return appropriate opacity
 // FUTURE IMPLEMENTATION: Uncomment when not using Expo Go (requires dev build)
@@ -183,8 +187,49 @@ const TimelineScreen = () => {
   const theme = useTheme();
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
+  const [headerAreaHeight, setHeaderAreaHeight] = useState(240);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [matchedIndices, setMatchedIndices] = useState<number[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const keyboardHeight = useRef(new Animated.Value(0)).current;
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const timelineRef = useRef<FlatList>(null);
   const params = useLocalSearchParams<{ scrollToDate?: string }>();
+
+  // Track keyboard visibility and animate height
+  useEffect(() => {
+    // Use keyboardWillShow/Hide on iOS for smoother animation
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    
+    // iOS keyboard uses this specific easing curve
+    const keyboardEasing = Easing.bezier(0.17, 0.59, 0.4, 0.77);
+    
+    const showSubscription = Keyboard.addListener(showEvent, (e) => {
+      setIsKeyboardVisible(true);
+      Animated.timing(keyboardHeight, {
+        toValue: e.endCoordinates.height,
+        duration: Platform.OS === 'ios' ? e.duration : 250,
+        easing: keyboardEasing,
+        useNativeDriver: false,
+      }).start();
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, (e) => {
+      // Animate to off-screen position (negative value)
+      Animated.timing(keyboardHeight, {
+        toValue: -100,
+        duration: Platform.OS === 'ios' ? e.duration : 250,
+        easing: keyboardEasing,
+        useNativeDriver: false,
+      }).start(() => {
+        setIsKeyboardVisible(false);
+      });
+    });
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [keyboardHeight]);
 
   useEffect(() => {
     // Changed to ascending order (oldest first)
@@ -333,7 +378,14 @@ const TimelineScreen = () => {
     if (typeof item === "string") {
       return renderMonthSeparator(item);
     }
-    return <EventCard event={item} onDelete={handleDeleteEvent} onEdit={handleEditEvent} />;
+    return (
+      <EventCard 
+        event={item} 
+        onDelete={handleDeleteEvent} 
+        onEdit={handleEditEvent}
+        searchQuery={searchQuery}
+      />
+    );
   };
 
   const handleEditEvent = (event: Event) => {
@@ -383,20 +435,94 @@ const TimelineScreen = () => {
     }
   };
 
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+
+    // Only search when 3+ characters are typed
+    if (query.length >= 3) {
+      const lowerQuery = query.toLowerCase();
+      
+      // Find ALL matching event indices in flatListData
+      const indices: number[] = [];
+      flatListData.forEach((item, index) => {
+        if (typeof item === "string") return; // Skip month headers
+        if (
+          item.title.toLowerCase().includes(lowerQuery) ||
+          item.description?.toLowerCase().includes(lowerQuery)
+        ) {
+          indices.push(index);
+        }
+      });
+
+      setMatchedIndices(indices);
+      setCurrentMatchIndex(0);
+
+      if (indices.length > 0) {
+        // Scroll to the first matching event
+        timelineRef.current?.scrollToIndex({
+          index: indices[0],
+          animated: true,
+          viewPosition: 1,
+          viewOffset: -100,
+        });
+      }
+    } else {
+      setMatchedIndices([]);
+      setCurrentMatchIndex(0);
+    }
+  };
+
+  const navigateToNextMatch = () => {
+    if (matchedIndices.length === 0) return;
+    const nextIndex = (currentMatchIndex + 1) % matchedIndices.length;
+    setCurrentMatchIndex(nextIndex);
+    timelineRef.current?.scrollToIndex({
+      index: matchedIndices[nextIndex],
+      animated: true,
+      viewPosition: 1,
+      viewOffset: -100,
+    });
+  };
+
+  const navigateToPrevMatch = () => {
+    if (matchedIndices.length === 0) return;
+    const prevIndex = currentMatchIndex === 0 ? matchedIndices.length - 1 : currentMatchIndex - 1;
+    setCurrentMatchIndex(prevIndex);
+    timelineRef.current?.scrollToIndex({
+      index: matchedIndices[prevIndex],
+      animated: true,
+      viewPosition: 1,
+      viewOffset: -100,
+    });
+  };
+
   return (
     <View style={styles.container}>
-      <CalendarPreview
-        onDateSelect={handleDateSelect}
-        selectedDate={selectedDate}
-      />
+      <View onLayout={(e) => setHeaderAreaHeight(e.nativeEvent.layout.height)}>
+        <TimelineHeader 
+          searchValue={searchQuery}
+          onSearchChange={handleSearchChange}
+        />
+        <CalendarPreview
+          onDateSelect={(date) => {
+            Keyboard.dismiss();
+            handleDateSelect(date);
+          }}
+          selectedDate={selectedDate}
+        />
+      </View>
       <View style={styles.timelineLine} />
       <FlatList
         ref={timelineRef}
         data={flatListData}
         inverted
         showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="always"
+        onScrollBeginDrag={Keyboard.dismiss}
         keyExtractor={(item) => (typeof item === "string" ? item : item.id)}
         renderItem={renderItem}
+        style={{ zIndex: 1 }}
         contentContainerStyle={[
           styles.eventList,
           { flexGrow: 1, justifyContent: "flex-end", paddingTop: 80 },
@@ -414,7 +540,7 @@ const TimelineScreen = () => {
       {/* Gradient Fade Overlay - Top */}
       <LinearGradient
         colors={["#0f0f0f", "rgba(15, 15, 15, 0)"]}
-        style={styles.gradientOverlay}
+        style={[styles.gradientOverlay, { top: headerAreaHeight }]}
         pointerEvents="none"
       />
       {/* Gradient Fade Overlay - Bottom */}
@@ -426,12 +552,73 @@ const TimelineScreen = () => {
       {/* Floating Add Event Button */}
       <TouchableOpacity
         style={styles.floatingButton}
-        onPress={() => router.push("/addEvent")}
+        onPress={() => {
+          Keyboard.dismiss();
+          router.push("/addEvent");
+        }}
         activeOpacity={0.8}
       >
         <MaterialCommunityIcons name="plus" size={28} color="#FFFFFF" />
       </TouchableOpacity>
+
+      {/* Search Results Navigation Panel - above keyboard */}
+      {matchedIndices.length > 0 && isKeyboardVisible && (
+        <Animated.View style={[styles.searchResultsPanel, { bottom: keyboardHeight }]}>
+          <View style={styles.searchResultsLeft}>
+            <Text style={styles.searchResultsLabel}>Search Results: </Text>
+            <Text style={styles.searchResultsCount}>{currentMatchIndex + 1}</Text>
+            <Text style={styles.searchResultsLabel}> of {matchedIndices.length}</Text>
+          </View>
+          <View style={styles.searchResultsRight}>
+            <TouchableOpacity 
+              style={styles.searchNavButton} 
+              onPress={navigateToPrevMatch}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="chevron-down" size={24} color="#E6E6E6" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.searchNavButton} 
+              onPress={navigateToNextMatch}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="chevron-up" size={24} color="#E6E6E6" />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
     </View>
+  );
+};
+
+// Helper component to highlight matching text
+const HighlightedText = ({
+  text,
+  highlight,
+  style,
+  numberOfLines,
+}: {
+  text: string;
+  highlight: string;
+  style: any;
+  numberOfLines?: number;
+}) => {
+  if (!highlight || highlight.length < 3) {
+    return <Text style={style} numberOfLines={numberOfLines}>{text}</Text>;
+  }
+
+  const parts = text.split(new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+  
+  return (
+    <Text style={style} numberOfLines={numberOfLines}>
+      {parts.map((part, index) =>
+        part.toLowerCase() === highlight.toLowerCase() ? (
+          <Text key={index} style={{ backgroundColor: '#3A3A0A' }}>{part}</Text>
+        ) : (
+          part
+        )
+      )}
+    </Text>
   );
 };
 
@@ -439,10 +626,12 @@ const EventCard = ({
   event,
   onDelete,
   onEdit,
+  searchQuery = "",
 }: {
   event: Event;
   onDelete: (id: string) => void;
   onEdit: (event: Event) => void;
+  searchQuery?: string;
 }) => {
   const theme = useTheme();
   const styles = makeStyles(theme);
@@ -524,7 +713,7 @@ const EventCard = ({
   const blurOpacity = useImageBrightness(firstImage);
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity activeOpacity={1} onPress={Keyboard.dismiss} style={styles.card}>
       {/* Blurred Background Image with MaskedView for smooth edges */}
       {firstImage && (
         <View style={styles.blurImageContainer}>
@@ -580,7 +769,11 @@ const EventCard = ({
         containerStyle={styles.swipeableContainer}
       >
         <View style={styles.cardContent}>
-          <Text style={styles.eventTitle}>{event.title}</Text>
+          <HighlightedText 
+            text={event.title} 
+            highlight={searchQuery}
+            style={styles.eventTitle}
+          />
           {event.tags && event.tags.length > 0 && (
             <EventTags tags={event.tags} />
           )}
@@ -601,13 +794,16 @@ const EventCard = ({
 
           {/* Description - only show if available */}
           {event.description && event.description.trim() !== "" && (
-            <Text style={styles.eventDescription} numberOfLines={3}>
-              {event.description}
-            </Text>
+            <HighlightedText 
+              text={event.description} 
+              highlight={searchQuery}
+              style={styles.eventDescription}
+              numberOfLines={3}
+            />
           )}
         </View>
       </Swipeable>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -636,12 +832,12 @@ const makeStyles = (theme: MD3Theme) =>
     },
     gradientOverlay: {
       position: "absolute",
-      top: 112, // Below the calendar preview
+      // top is set dynamically via headerAreaHeight
       left: 0,
       right: 0,
-      height: 60,
-      zIndex: 50,
-      opacity: 0.8,
+      height: 80,
+      zIndex: 101,
+      opacity: 1,
     },
     gradientOverlayBottom: {
       position: "absolute",
@@ -955,6 +1151,47 @@ const makeStyles = (theme: MD3Theme) =>
       shadowRadius: 8,
       elevation: 8,
       zIndex: 100,
+    },
+    // Search Results Navigation Panel
+    searchResultsPanel: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 4,
+      backgroundColor: "#151515",
+      borderTopWidth: 1,
+      borderTopColor: "#2B2B2B",
+      zIndex: 50, // Above timeline content, keyboard is system overlay so it will still cover this
+    },
+    searchResultsLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    searchResultsLabel: {
+      fontFamily: "PPNeueMontreal-Book",
+      fontSize: 14,
+      letterSpacing: 1,
+      lineHeight: 24,
+      color: "#7D7D8A",
+    },
+    searchResultsCount: {
+      fontFamily: "PPNeueMontreal-Medium",
+      fontSize: 14,
+      letterSpacing: 1,
+      lineHeight: 24,
+      color: "#FFFFFF",
+    },
+    searchResultsRight: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    searchNavButton: {
+      padding: 8,
     },
   });
 

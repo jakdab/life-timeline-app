@@ -30,6 +30,7 @@ export default function TabLayout() {
         options={{
           title: "Timeline",
           headerTitle: "TIMELINE",
+          headerShown: false,
         }}
       />
     </Tabs>
