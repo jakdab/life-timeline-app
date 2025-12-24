@@ -18,7 +18,7 @@ import {
   IconButton,
 } from "react-native-paper";
 import CustomTextInput from "../components/CustomTextInput";
-import { DatePickerModal } from "react-native-paper-dates";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { db, storage } from "../lib/firebase";
 import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -237,10 +237,12 @@ const AddEventScreen = () => {
     }
   };
 
-  const onConfirmDate = ({ date }: { date: Date | undefined }) => {
-    setDatePickerOpen(false);
-    if (date) {
-      setDate(date);
+  const onConfirmDate = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setDatePickerOpen(false);
+    }
+    if (selectedDate) {
+      setDate(selectedDate);
     }
   };
 
@@ -319,29 +321,46 @@ const AddEventScreen = () => {
         />
 
         {/* Date Picker */}
-        <TouchableOpacity
-          onPress={() => setDatePickerOpen(true)}
-          disabled={loading}
-        >
-          <View pointerEvents="none">
-            <CustomTextInput
-              label="Event Date"
-              placeholder="Select a date"
-              value={date ? format(date, "MMMM d, yyyy") : ""}
-              editable={false}
-              rightIcon="calendar"
-            />
+        <View style={styles.datePickerContainer}>
+          <Text style={styles.label}>Event Date</Text>
+          <View style={[
+            styles.dateInputWrapper,
+            datePickerOpen && styles.dateInputWrapperExpanded
+          ]}>
+            <TouchableOpacity
+              onPress={() => setDatePickerOpen(!datePickerOpen)}
+              disabled={loading}
+              style={styles.dateInputTouchable}
+            >
+              <Text style={[
+                styles.dateInputText,
+                !date && styles.dateInputPlaceholder
+              ]}>
+                {date ? format(date, "MMMM d, yyyy") : "Select a date"}
+              </Text>
+              <IconButton
+                icon={datePickerOpen ? "chevron-up" : "calendar"}
+                iconColor="#7D7D8A"
+                size={20}
+                style={styles.dateInputIcon}
+              />
+            </TouchableOpacity>
+            
+            {datePickerOpen && (
+              <>
+                <View style={styles.datePickerDivider} />
+                <DateTimePicker
+                  value={date || new Date()}
+                  mode="date"
+                  display="inline"
+                  onChange={onConfirmDate}
+                  themeVariant="dark"
+                  style={styles.datePicker}
+                />
+              </>
+            )}
           </View>
-        </TouchableOpacity>
-
-        <DatePickerModal
-          locale="en"
-          mode="single"
-          visible={datePickerOpen}
-          onDismiss={() => setDatePickerOpen(false)}
-          date={date}
-          onConfirm={onConfirmDate}
-        />
+        </View>
 
         {/* Description Input */}
         <CustomTextInput
@@ -477,6 +496,48 @@ const makeStyles = (theme: MD3Theme, topInset: number) =>
       letterSpacing: 0.14,
       color: "#e8e8eb",
       marginBottom: 4,
+    },
+    datePickerContainer: {
+      marginBottom: 16,
+    },
+    dateInputWrapper: {
+      backgroundColor: "#121111",
+      borderWidth: 1,
+      borderColor: "#1E1E1E",
+      borderRadius: 12,
+      overflow: "hidden",
+    },
+    dateInputWrapperExpanded: {
+      borderColor: "#4D4D56",
+    },
+    dateInputTouchable: {
+      flexDirection: "row",
+      alignItems: "center",
+      minHeight: 44,
+      paddingHorizontal: 12,
+    },
+    dateInputText: {
+      flex: 1,
+      fontFamily: "PPNeueMontreal-Book",
+      fontSize: 16,
+      lineHeight: 20,
+      letterSpacing: 0.32,
+      color: "#FFFFFF",
+    },
+    dateInputPlaceholder: {
+      color: "#7D7D8A",
+    },
+    dateInputIcon: {
+      margin: 0,
+    },
+    datePickerDivider: {
+      height: 1,
+      backgroundColor: "#1E1E1E",
+    },
+    datePicker: {
+      backgroundColor: "#121111",
+      alignSelf: "center",
+      paddingBottom: 8,
     },
     photosGrid: {
       flexDirection: "row",
