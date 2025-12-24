@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   FlatList,
@@ -30,7 +30,7 @@ import {
   addMonths,
   subMonths,
 } from "date-fns";
-import { Swipeable } from "react-native-gesture-handler";
+import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { useLocalSearchParams } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -39,6 +39,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MaskedView from "@react-native-masked-view/masked-view";
 import Svg, { Defs, RadialGradient, Stop, Rect } from "react-native-svg";
 import TimelineHeader from "../../components/TimelineHeader";
+import BottomSheet from "@gorhom/bottom-sheet";
+import EventPreviewSheet from "../../components/EventPreviewSheet";
 
 // Custom hook to calculate image brightness and return appropriate opacity
 // FUTURE IMPLEMENTATION: Uncomment when not using Expo Go (requires dev build)
@@ -193,8 +195,21 @@ const TimelineScreen = () => {
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const keyboardHeight = useRef(new Animated.Value(0)).current;
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const timelineRef = useRef<FlatList>(null);
+  const bottomSheetRef = useRef<BottomSheet>(null);
   const params = useLocalSearchParams<{ scrollToDate?: string }>();
+
+  const handleEventPress = useCallback((event: Event) => {
+    Keyboard.dismiss();
+    setSelectedEvent(event);
+    bottomSheetRef.current?.snapToIndex(0);
+  }, []);
+
+  const handleSheetClose = useCallback(() => {
+    setSelectedEvent(null);
+    bottomSheetRef.current?.close();
+  }, []);
 
   // Track keyboard visibility and animate height
   useEffect(() => {
@@ -383,6 +398,7 @@ const TimelineScreen = () => {
         event={item} 
         onDelete={handleDeleteEvent} 
         onEdit={handleEditEvent}
+        onPress={handleEventPress}
         searchQuery={searchQuery}
       />
     );
@@ -497,7 +513,7 @@ const TimelineScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <View onLayout={(e) => setHeaderAreaHeight(e.nativeEvent.layout.height)}>
         <TimelineHeader 
           searchValue={searchQuery}
@@ -587,7 +603,15 @@ const TimelineScreen = () => {
           </View>
         </Animated.View>
       )}
-    </View>
+
+      {/* Event Preview Bottom Sheet */}
+      <EventPreviewSheet
+        ref={bottomSheetRef}
+        event={selectedEvent}
+        onClose={handleSheetClose}
+        onEdit={handleEditEvent}
+      />
+    </GestureHandlerRootView>
   );
 };
 
@@ -626,11 +650,13 @@ const EventCard = ({
   event,
   onDelete,
   onEdit,
+  onPress,
   searchQuery = "",
 }: {
   event: Event;
   onDelete: (id: string) => void;
   onEdit: (event: Event) => void;
+  onPress?: (event: Event) => void;
   searchQuery?: string;
 }) => {
   const theme = useTheme();
@@ -713,7 +739,7 @@ const EventCard = ({
   const blurOpacity = useImageBrightness(firstImage);
 
   return (
-    <TouchableOpacity activeOpacity={1} onPress={Keyboard.dismiss} style={styles.card}>
+    <TouchableOpacity activeOpacity={0.9} onPress={() => onPress?.(event)} style={styles.card}>
       {/* Blurred Background Image with MaskedView for smooth edges */}
       {firstImage && (
         <View style={styles.blurImageContainer}>
