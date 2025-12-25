@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   FlatList,
@@ -10,6 +10,8 @@ import {
   Keyboard,
   Platform,
   Easing,
+  ScrollView,
+  PanResponder,
 } from "react-native";
 import { Image } from "expo-image";
 import {
@@ -111,13 +113,30 @@ interface Event {
 const CalendarPreview = ({
   onDateSelect,
   selectedDate,
+  events,
 }: {
   onDateSelect: (date: Date) => void;
   selectedDate: Date;
+  events: Event[];
 }) => {
   const theme = useTheme();
   const styles = makeStyles(theme);
   const today = startOfToday();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isExpandedRef = useRef(false); // Ref to track current state for panResponder
+  const animatedHeight = useRef(new Animated.Value(0)).current;
+  const monthsScrollRef = useRef<ScrollView>(null);
+  const COLLAPSED_HEIGHT = 145;
+  const EXPANDED_HEIGHT = 450;
+
+  // Create set of dates with events for quick lookup
+  const eventDates = useMemo(() => {
+    const dates = new Set<string>();
+    events.forEach(event => {
+      dates.add(format(parseISO(event.date), "d MMM yyyy"));
+    });
+    return dates;
+  }, [events]);
 
   // Generate array of days (6 months before and 6 months after today)
   const generateDays = () => {
@@ -138,14 +157,121 @@ const CalendarPreview = ({
     (date) => format(date, "d MMM yyyy") === format(today, "d MMM yyyy")
   );
 
+  // Lazy loading: start with 3 months, load more on scroll
+  const [visibleMonthsCount, setVisibleMonthsCount] = useState(3);
+  const ALL_MONTHS_COUNT = 13; // 12 past + current
+
+  // Generate all months for expanded view - only past months and current (no future)
+  const allMonths = useMemo(() => {
+    const months = [];
+    // Generate 12 past months + current month
+    for (let i = 12; i >= 0; i--) {
+      const monthDate = subMonths(today, i);
+      months.push(monthDate);
+    }
+    return months;
+  }, []);
+
+  // Only render visible months (last N months from the array)
+  const visibleMonths = allMonths.slice(-visibleMonthsCount);
+
+  const loadMoreMonths = () => {
+    if (visibleMonthsCount < ALL_MONTHS_COUNT) {
+      setVisibleMonthsCount(prev => Math.min(prev + 3, ALL_MONTHS_COUNT));
+    }
+  };
+
+  const handleScroll = (event: any) => {
+    const { contentOffset } = event.nativeEvent;
+    // Load more when scrolling near the top
+    if (contentOffset.y < 100) {
+      loadMoreMonths();
+    }
+  };
+
+  const toggleExpanded = () => {
+    const newValue = !isExpandedRef.current;
+    const toValue = newValue ? 1 : 0;
+    Animated.timing(animatedHeight, {
+      toValue,
+      duration: 300,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+    
+    // Scroll to bottom (current month) when expanding
+    if (newValue) {
+      setTimeout(() => {
+        monthsScrollRef.current?.scrollToEnd({ animated: false });
+      }, 50);
+    }
+    
+    isExpandedRef.current = newValue;
+    setIsExpanded(newValue);
+  };
+
+  // Pan responder for drag gesture on grabber
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderRelease: (_, gestureState) => {
+        const { dy } = gestureState;
+        const currentlyExpanded = isExpandedRef.current;
+        
+        // Drag down (positive dy) = expand, drag up (negative dy) = collapse
+        if (dy > 20 && !currentlyExpanded) {
+          // Drag down to expand
+          Animated.timing(animatedHeight, {
+            toValue: 1,
+            duration: 300,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: false,
+          }).start();
+          setTimeout(() => {
+            monthsScrollRef.current?.scrollToEnd({ animated: false });
+          }, 50);
+          isExpandedRef.current = true;
+          setIsExpanded(true);
+        } else if (dy < -20 && currentlyExpanded) {
+          // Drag up to collapse
+          Animated.timing(animatedHeight, {
+            toValue: 0,
+            duration: 300,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: false,
+          }).start();
+          isExpandedRef.current = false;
+          setIsExpanded(false);
+        } else if (Math.abs(dy) < 10) {
+          // Tap (minimal movement) - toggle
+          toggleExpanded();
+        }
+      },
+    })
+  ).current;
+
+  const handleDateSelect = (date: Date) => {
+    onDateSelect(date);
+    if (isExpanded) {
+      toggleExpanded();
+    }
+  };
+
+  const containerHeight = animatedHeight.interpolate({
+    inputRange: [0, 1],
+    outputRange: [COLLAPSED_HEIGHT, EXPANDED_HEIGHT],
+  });
+
   const renderDay = ({ item: date }: { item: Date }) => {
-    const isSelected =
-      format(date, "d MMM yyyy") === format(selectedDate, "d MMM yyyy");
+    const dateKey = format(date, "d MMM yyyy");
+    const isSelected = dateKey === format(selectedDate, "d MMM yyyy");
     const isFirstOfMonth = format(date, "d") === "1";
+    const hasEvent = eventDates.has(dateKey);
 
     return (
       <TouchableOpacity
-        onPress={() => onDateSelect(date)}
+        onPress={() => handleDateSelect(date)}
         style={[
           styles.dayColumn,
           isSelected && styles.todayColumn,
@@ -158,30 +284,146 @@ const CalendarPreview = ({
         <Text style={[styles.dayNumber, isSelected && styles.todayText]}>
           {format(date, "d")}
         </Text>
+        {hasEvent && (
+          <View style={[styles.eventDot, isSelected && styles.eventDotSelected]} />
+        )}
       </TouchableOpacity>
     );
   };
 
+  // Get days in a month arranged by week
+  const getMonthWeeks = (monthDate: Date) => {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    
+    // Start week on Monday (1) instead of Sunday (0)
+    let startDayOfWeek = firstDay.getDay() - 1;
+    if (startDayOfWeek < 0) startDayOfWeek = 6;
+    
+    const weeks: (Date | null)[][] = [];
+    let currentWeek: (Date | null)[] = new Array(startDayOfWeek).fill(null);
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      currentWeek.push(date);
+      
+      if (currentWeek.length === 7) {
+        weeks.push(currentWeek);
+        currentWeek = [];
+      }
+    }
+    
+    if (currentWeek.length > 0) {
+      while (currentWeek.length < 7) {
+        currentWeek.push(null);
+      }
+      weeks.push(currentWeek);
+    }
+    
+    return weeks;
+  };
+
+  const renderMonthGrid = (monthDate: Date) => {
+    const weeks = getMonthWeeks(monthDate);
+    const monthKey = format(monthDate, "MMM yyyy");
+    
+    return (
+      <View key={monthKey} style={styles.monthSection}>
+        <Text style={styles.monthLabel}>{monthKey}</Text>
+        {weeks.map((week, weekIndex) => (
+          <View key={`${monthKey}-${weekIndex}`} style={styles.weekRow}>
+            {week.map((date, dayIndex) => {
+              if (!date) {
+                return <View key={`empty-${dayIndex}`} style={styles.gridDayEmpty} />;
+              }
+              const dateKey = format(date, "d MMM yyyy");
+              const isSelected = dateKey === format(selectedDate, "d MMM yyyy");
+              const isToday = dateKey === format(today, "d MMM yyyy");
+              const hasEvent = eventDates.has(dateKey);
+              
+              return (
+                <TouchableOpacity
+                  key={date.toISOString()}
+                  style={[
+                    styles.gridDay,
+                    isSelected && styles.gridDaySelected,
+                    isToday && !isSelected && styles.gridDayToday,
+                  ]}
+                  onPress={() => handleDateSelect(date)}
+                >
+                  <Text style={[
+                    styles.gridDayText,
+                    isSelected && styles.gridDayTextSelected,
+                    isToday && !isSelected && styles.gridDayTextToday,
+                  ]}>
+                    {format(date, "d")}
+                  </Text>
+                  {hasEvent && (
+                    <View style={[styles.gridEventDot, isSelected && styles.gridEventDotSelected]} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   return (
-    <View style={styles.calendarContainer}>
-      <FlatList
-        horizontal
-        data={days}
-        renderItem={renderDay}
-        keyExtractor={(date) => date.toISOString()}
-        showsHorizontalScrollIndicator={false}
-        initialScrollIndex={todayIndex - 2}
-        getItemLayout={(data, index) => ({
-          length: 64,
-          offset: 64 * index,
-          index,
-        })}
-        contentContainerStyle={styles.daysRow}
-        initialNumToRender={30}
-        maxToRenderPerBatch={30}
-        windowSize={15}
-      />
-    </View>
+    <Animated.View style={[styles.calendarContainer, { height: containerHeight }]}>
+      {/* Collapsed View - Horizontal Week */}
+      {!isExpanded && (
+        <FlatList
+          horizontal
+          data={days}
+          renderItem={renderDay}
+          keyExtractor={(date) => date.toISOString()}
+          showsHorizontalScrollIndicator={false}
+          initialScrollIndex={todayIndex - 2}
+          getItemLayout={(data, index) => ({
+            length: 64,
+            offset: 64 * index,
+            index,
+          })}
+          contentContainerStyle={styles.daysRow}
+          initialNumToRender={30}
+          maxToRenderPerBatch={30}
+          windowSize={15}
+        />
+      )}
+
+      {/* Expanded View - Full Month Grid (pre-rendered, hidden when collapsed) */}
+      <View style={[styles.expandedContainer, { display: isExpanded ? 'flex' : 'none' }]}>
+        {/* Day of Week Header */}
+        <View style={styles.weekdayHeader}>
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+            <Text key={index} style={styles.weekdayText}>{day}</Text>
+          ))}
+        </View>
+        
+        {/* Scrollable Months */}
+        <ScrollView 
+          ref={monthsScrollRef}
+          style={styles.monthsScroll}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={100}
+        >
+          {visibleMonths.map((monthDate: Date) => renderMonthGrid(monthDate))}
+        </ScrollView>
+      </View>
+      {/* Grabber Handle - supports drag gesture */}
+      <View 
+        style={styles.grabberContainer} 
+        {...panResponder.panHandlers}
+      >
+        <View style={styles.grabber} />
+      </View>
+    </Animated.View>
   );
 };
 
@@ -525,6 +767,7 @@ const TimelineScreen = () => {
             handleDateSelect(date);
           }}
           selectedDate={selectedDate}
+          events={events}
         />
       </View>
       <View style={styles.timelineLine} />
@@ -1104,6 +1347,105 @@ const makeStyles = (theme: MD3Theme) =>
     },
     firstOfMonth: {
       marginLeft: 16,
+    },
+    // Expanded Calendar Styles
+    grabberContainer: {
+      alignItems: "center",
+      paddingVertical: 8,
+      marginTop: 4,
+    },
+    grabber: {
+      width: 40,
+      height: 4,
+      backgroundColor: "#7D7D8A",
+      borderRadius: 2,
+    },
+    expandedContainer: {
+      flex: 1,
+      paddingHorizontal: 16,
+    },
+    weekdayHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingHorizontal: 4,
+      marginBottom: 8,
+    },
+    weekdayText: {
+      width: 44,
+      textAlign: "center",
+      color: "#7D7D8A",
+      fontSize: 12,
+      fontFamily: "PPNeueMontreal-Medium",
+    },
+    monthsScroll: {
+      flex: 1,
+    },
+    monthSection: {
+      marginBottom: 16,
+    },
+    monthLabel: {
+      color: "#E6E6E6",
+      fontSize: 16,
+      fontFamily: "PPNeueMontreal-Medium",
+      marginBottom: 12,
+      marginLeft: 4,
+    },
+    weekRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingHorizontal: 4,
+      marginBottom: 4,
+    },
+    gridDay: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 22,
+    },
+    gridDayEmpty: {
+      width: 44,
+      height: 44,
+    },
+    gridDaySelected: {
+      backgroundColor: "#B5B5B5",
+    },
+    gridDayToday: {
+      borderWidth: 1,
+      borderColor: "#7D7D8A",
+    },
+    gridDayText: {
+      color: "#E6E6E6",
+      fontSize: 14,
+      fontFamily: "PPNeueMontreal-Medium",
+    },
+    gridDayTextSelected: {
+      color: "#151515",
+    },
+    gridDayTextToday: {
+      color: "#E6E6E6",
+    },
+    // Event indicator dots for collapsed calendar
+    eventDot: {
+      width: 4,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: "#C1C1C1",
+      marginTop: 4,
+    },
+    eventDotSelected: {
+      backgroundColor: "#E6E6E6",
+    },
+    // Event indicator dots for expanded calendar grid
+    gridEventDot: {
+      width: 4,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: "#E6E6E6",
+      marginTop: 2,
+    },
+    gridEventDotSelected: {
+      backgroundColor: "#151515",
     },
     // Swipeable container
     swipeableContainer: {

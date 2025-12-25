@@ -54,7 +54,7 @@ const AddEventScreen = () => {
   const isEditMode = !!params.eventId;
   
   const [title, setTitle] = useState("");
-  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [date, setDate] = useState<Date | undefined>(isEditMode ? undefined : new Date());
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
